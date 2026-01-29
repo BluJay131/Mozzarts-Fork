@@ -1,5 +1,6 @@
 import {EmbedBuilder, SlashCommandBuilder } from "discord.js";
 // Allows for the path of the rules.json to be used for ease of changing the rules
+// Mainly a helper 
 import {getRules} from "../helpers/rules.js";
 
 export default {
@@ -7,8 +8,8 @@ export default {
         .setName("rules")
         .setDescription("Music trivia rules!")
     ,
-    
     async execute(interaction) {
+        // Gets the rules from the helper 
         const rules = getRules();
 
         const embed = new EmbedBuilder()
@@ -19,9 +20,9 @@ export default {
             { name: 'Difficulties:', value: rules.difficulties.map(g =>`- ${g}`).join('\n'), inline: true },
             { name: 'How to Play', value: rules.gameplay.map(g => `- ${g}`).join('\n') }
         )
-        .setFooter({ text: 'Good luck, maestro!' });
+        .setFooter({ text: "May you have PLUCK!" });
 
-        //Ephemeral allows for the user that requested the rules to see it
+        //Ephemeral allows for only the user that requested the rules to see it
         await interaction.reply({
         content: "Here are the rules",
         embeds: [embed],
