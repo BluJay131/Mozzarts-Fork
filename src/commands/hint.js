@@ -1,5 +1,4 @@
 import { InteractionResponse, SlashCommandBuilder } from "discord.js";
-//import { getMeme } from "../helpers/meme.js"; // Not needed
 const hintHelper = require('../helpers/hintHelper.js');
 
 export default {
@@ -11,23 +10,18 @@ export default {
         .setName("song_name")
         .setDescription("Choose a song")
         .setRequired(true)
-        /*.addChoices(
-          { name: "Pop", value: "pop" },
-          { name: "Hip Hop", value: "hiphop" },
-          { name: "Rock", value: "rock" },
-          { name: "Country", value: "country" },
-          { name: "Classical", value: "classical" },
-          { name: "Random", value: "random"}
-        )*/
     ),
 
   async execute(interaction) {
-    //const meme = await getMeme();
-    //const hint = hintHelper.getHint("radioactive");
-    const hint = hintHelper.getHint(interaction.options.getString("song_name"));
+    // This is not the final implementation; in the future it will detect which song is currently being
+    // guessed and get details from iTunes
+    let input = interaction.options.getString("song_name");
+    const hint = hintHelper.getHint(input);
 
     await interaction.reply({
-      content: "Hint: " + hint,
+      content: "Here is your hint: " + hint,
     });
+
+    
   },
 };
