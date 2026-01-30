@@ -66,13 +66,22 @@ Requirements:
     Wrong which also shows the Question, Correct Answer, User's Answer, and
     the name of the question was answered by.
 ```
-
+---
 ### Jayden Elishaw - Release Notes:
-```
+
 #### Primary added features
 - Added logging for all implemented features
 - `/game` command: joins voice channel `Game`, downloads a random iTunes 30s preview, plays it, cleans up, leaves voice, then runs a 30s countdown message in `#game` and finally reveals the track name
 - Logs to terminal for debugging voice/HTTP/command execution
+
+##### Pre-Build commands (new)
+-Run these once to set up environment (installs new discordJS version and FFMPEG)
+```
+sudo apt-get update
+sudo apt-get install -y ffmpeg
+npm i discord.js@^14
+npm i -D @discordjs/rest discord-api-types
+```
 
 ##### Build commands (new)
 - Source files live under `src/`
@@ -85,4 +94,5 @@ Requirements:
 - `npm start` runs:
   1) build
   2) `node -r dotenv/config build/app.js`
-```
+---
+
