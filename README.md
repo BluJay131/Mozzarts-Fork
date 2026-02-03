@@ -1,28 +1,35 @@
-# Mozzarts 
+# Mozzarts
+
 ```
 Memebers: Will Sarmiento, David Hochberg, Jayden Elishaw, Arteen Ramezani, Khoa Vo
 ```
+
 NOTE: Some issues with slash commands on discord app, so a possible fix is the use of testing in the web browser for [discord](https://discord.com/)!
 
-
-
 ## This is the current state of the project
+
 Memebers need to fork this project and then clone this Repo to start!
+
 ### Brainstorming:
+
 We thought of a couple of ideas such as:
+
 ```
 Gambling bot (Blackjack, Complex slots, Roullette, Poker)
 Trivia bot (Music, Common Knowledge, Movies/Shows)
 Game bot (Wordle, Uno/Card Games, Connect 4)
 ```
+
 These are only a few but so far we are leaning towards a mix of the game/gambling bot!
 
-
 ### Chosen Bot:
+
 We have chosen the:
+
 ```
 Music trivia bot!
 ```
+
 Now We are in the part of finding our requirements and functions!
 
 Requirements:
@@ -31,16 +38,65 @@ Requirements:
 2. Points
 3. Leaderboard
 
-# RELEASE NOTES (Version 1.0): 
-### Added: 
+
+> # Version 1.0
+### Arteen Ramezani - Release Notes:
+
+```
+- Added the bot trivia command:
+  - When called the bot shows a preview which will contain a description and
+    difficulties to pick from. Underneath the preview there are interactable
+    buttons with difficulties the user can choose from which for now just displays
+    music questions with multiple choice answers also as buttons. If the answer
+    is correct, based on respective difficulty, the bot will "give" 1, 2, or 3 points
+    to the user (tracking the points is a work in progress). If wrong, gives no points.
+    Additionally after the user picks an answer, there is a display for Correct or
+    Wrong which also shows the Question, Correct Answer, User's Answer, and
+    the name of the question was answered by.
+```
+> # Version 1.02
+---
+### Jayden Elishaw - Release Notes:
+
+#### Primary added features
+- Added logging for all implemented features
+- `/game` command: joins voice channel `Game`, downloads a random iTunes 30s preview, plays it, cleans up, leaves voice, then runs a 30s countdown message in `#game` and finally reveals the track name
+- Logs to terminal for debugging voice/HTTP/command execution
+
+##### Pre-Build commands (new)
+-Run these once to set up environment (installs new discordJS version and FFMPEG)
+```
+sudo apt-get update
+sudo apt-get install -y ffmpeg
+npm i discord.js@^14
+npm i -D @discordjs/rest discord-api-types
+```
+
+##### Build commands (new)
+- Source files live under `src/`
+- `npm run build` runs esbuild:
+  - Bundles/transpiles JS
+  - Outputs CommonJS modules into `build/`
+  - Preserves folder structure via `--outbase=src`
+
+##### Runtime commands (same)
+- `npm start` runs:
+  1) build
+  2) `node -r dotenv/config build/app.js`
+---
+
+> # Version 1.0.3
+> ### Will Sarmiento - Release Notes
+### Added:
 ```
 - Explanation of the rules
-- TODO: Other features added
-
 ```
 
-
-
-
+> # Version 1.0.4
+> ### Khoa Vo - Release Notes
+### Added:
+```
+- Basic genre feature that allows user to select the genre of the song
+```
 
 
