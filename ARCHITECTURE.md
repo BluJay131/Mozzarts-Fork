@@ -34,3 +34,11 @@ In Figure 1.3 below, it shows the fundamental blue print of our system and how e
 
 <img src="images/Bot-Use-Case-Diagram.png" ald="This is the use case diagram for the Mozzartz bot" width="900">
 
+## **Class Diagram (ArteenR):**
+Figure 1.4 shows the connections between the major classes and how they interact within the music trivia bot system.
+
+<ins> **Figure 1.4** </ins>
+
+<img width="4714" height="8192" alt="Mozzarts-Class_Architecture-ArteenR" src="https://github.com/user-attachments/assets/244c5fd5-9cfe-40a6-b392-d6104d1a040e" />
+
+
