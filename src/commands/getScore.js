@@ -1,5 +1,5 @@
 const { SlashCommandBuilder } = require('discord.js');
-const scoreStore = require('../scoreStore');
+const scoreStore = require('../helpers/scoreStore');
 
 module.exports = {
   data: new SlashCommandBuilder()
