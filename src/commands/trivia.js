@@ -26,7 +26,7 @@ import http from "node:http";
 import zlib from "node:zlib";
 
 import { getGenre, getSession, setSession, clearSession } from "../gameState.js";
-import { resetScores, addPoints, getGuildScoresSorted } from "../scoreStore.js";
+import { resetScores, addPoints, getGuildScoresSorted } from "../helpers/scoreStore.js";
 import { makeHint } from "../helpers/hintHelper.js";
 
 const VOICE_CHANNEL_NAME = "Game";

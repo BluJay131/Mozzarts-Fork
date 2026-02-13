@@ -265,6 +265,8 @@ async function playFileInVoice(guild, vc, filePath) {
   }
 }
 
+// Maybe better organizations? 
+// Essentially have the actual game logic run on a command named music_trivia?
 export default {
   data: new SlashCommandBuilder()
     .setName("game")
@@ -296,7 +298,14 @@ export default {
       if (tc) {
         // added rules explanation
         await rules.execute(tc, true);
-        await sleep(20000);
+        // Just the amount of time the user has to read
+        // the rules
+        statusMsg = await tc.send("Game will start soon! Make sure to read over the rules!");
+        for (let c = 20; c >= 0; c--) {
+          await statusMsg.edit(`Time before game starts: ${c}`);
+          // one second delay
+          await sleep(1000);
+        }
         statusMsg = await tc.send("Downloading song...");
       } 
 
@@ -314,11 +323,13 @@ export default {
 
       // countdown AFTER playback
       if (statusMsg) {
-        for (let r = 20; r >= 1; r--) {
+        for (let r = 20; r >= 0; r--) {
           await statusMsg.edit(`⏳ ${r}`);
           // one second delay
           await sleep(1000);
         }
+        // TODO: have a guessing phase before revealing the answer,
+        // Key component for the game, High priority.
         // reveal track name ONLY after countdown
         await statusMsg.edit(`✅ ${track.trackName} — ${track.artistName}`);
       }
