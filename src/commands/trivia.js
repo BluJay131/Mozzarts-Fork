@@ -284,6 +284,11 @@ function isCorrectGuess(msgContent, track, difficulty) {
   return titleHit && artistHit;
 }
 
+export const _test = {
+  normalize,
+  pointsFor,
+};
+
 export default {
   data: new SlashCommandBuilder()
     .setName("trivia")
@@ -631,4 +636,6 @@ export default {
       clearSession(guild.id);
     }
   },
+
+  
 };
