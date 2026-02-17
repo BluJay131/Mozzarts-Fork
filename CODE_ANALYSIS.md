@@ -17,7 +17,7 @@ For this task, I analyzed the bot by measuring the cyclomatic complexity of its 
 
 In software engineering, cohesion is when a function operates as its own unit, creating a stable and efficient architecture. Contrarily, coupling occurs when there are many interdependencies between the features of the project. I analyzed our bot’s architecture and code to determine which aspects are cohesive and what is coupled. From this, I found that most of our bot is cohesive. However, player interactions are currently coupled, with multiple components sending messages to the players.
 
-### **Cyclomatic Complexity of Different Functionalities**
+### **Cohesion and coupling of Different Functionalities**
 
 What is cohesive in our current design/architecture:
 
