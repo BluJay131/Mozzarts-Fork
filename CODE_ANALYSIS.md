@@ -48,3 +48,45 @@ As for code smells, our bot has is a large class in which can be further broken 
 
 ## **Test Coverage Analysis (Jayden Elishaw):**
 For this task, I attempted to measure our test coverage across the entire project by running Mocha test suite under a standard Node coverage tool (c8/nyc). The plan was: install dependencies (npm ci), confirm tests run (npm test), then generate coverage (npx c8 npm test or an npm run coverage script). Currently we have ZERO tests at all thus 'npm test' outputs "Error: No test files found: "./tests/*.spec.js"". Even without a tool-generated report, I verified that our current tests coverage as in commands, event handlers, game state transitions, score persistence, hint/rules helpers, and loader logic are all currently untested. On top of that, the existing trivia test suite includes assertions explicitly marked “expected to fail,” which means we don’t yet have a clean “green” baseline suitable for gating or tracking coverage over time.
+
+## Threat Model Analysis (Kieran Moynihan)
+
+For this task, I developed a threat model to analyze potential security risks and weaknesses in our Discord bot. Because the bot accepts input directly from Discord users through slash commands and interaction events, it is important to evaluate how malicious or unexpected input could affect the bot’s stability, reliability, and integrity.
+
+### Assets to Protect
+
+The primary assets that need protection include:
+
+- Bot uptime and overall stability  
+- Score tracking and game state data  
+- Discord server integrity  
+- Bot configuration and authentication credentials  
+
+If any of these assets are compromised, the bot could crash, behave incorrectly, or produce inaccurate results.
+
+### Threat Actors
+
+The most likely threat actors are Discord users, including those who may intentionally try to break the bot by providing invalid input, spamming commands, or triggering unexpected behavior. Since the bot is publicly accessible within the server, any user can interact with it and potentially exploit weaknesses.
+
+### Attack Surfaces
+
+The primary attack surface is user input through slash commands and interaction events. Because users control the input, they may provide malformed, unexpected, or extreme values that the bot does not properly handle. This could result in crashes, undefined behavior, or corrupted game state.
+
+Another attack surface is the bot’s dynamic loading of command and event files. If file handling is not carefully controlled, it increases the risk of loading unintended or invalid code.
+
+### Identified Threats
+
+The following threats were identified during this analysis:
+
+- Malformed or unexpected user input causing crashes or incorrect behavior  
+- Command spam leading to performance degradation or denial of service  
+- Improper input validation allowing corruption of score or game state data  
+- Unhandled exceptions causing the bot to stop responding  
+
+These threats primarily impact the bot’s stability and reliability.
+
+### Mitigations
+
+To reduce these risks, the bot should implement stronger input validation and improved error handling. Adding try/catch blocks around command execution would prevent crashes caused by unexpected input. Implementing rate limiting would reduce the risk of command spam. Additionally, improving logging and validation would make the bot more resilient and easier to maintain.
+
+Overall, this threat model identified several vulnerabilities related to user input and command handling. Addressing these risks would improve the bot’s reliability, stability, and overall security.
