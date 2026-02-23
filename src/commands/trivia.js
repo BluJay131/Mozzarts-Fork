@@ -19,15 +19,12 @@ import {
 } from "@discordjs/voice";
 
 import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
-import https from "node:https";
-import http from "node:http";
-import zlib from "node:zlib";
 
 import { getGenre, getSession, setSession, clearSession } from "../gameState.js";
-import {  getGuildScoresSorted } from "../helpers/scoreStore.js";
+import { getGuildScoresSorted, addPoints, resetScores } from "../helpers/scoreStore.js";
 import { makeHint } from "../helpers/hintHelper.js";
+import { makeSongQuestion, createTriviaQuestion, createResultEmbed } from "../helpers/trivia.js";
+import { getRandomItunesTrack, downloadPreview } from "../helpers/itunes.js";
 
 const VOICE_CHANNEL_NAME = "Game";
 const TEXT_CHANNEL_NAME = "game";
@@ -67,144 +64,8 @@ function stripTitleVariants(title) {
   return [t, noParens, noDash].filter(Boolean);
 }
 
-function decompressIfNeeded(buf, encoding) {
-  try {
-    if (!encoding) return buf;
-    const enc = String(encoding).toLowerCase();
-    if (enc.includes("gzip")) return zlib.gunzipSync(buf);
-    if (enc.includes("deflate")) return zlib.inflateSync(buf);
-    if (enc.includes("br")) return zlib.brotliDecompressSync(buf);
-    return buf;
-  } catch {
-    return buf;
-  }
-}
 
-function requestBuffer(urlStr, { timeoutMs = 30000, maxBytes = 12_000_000, redirects = 5 } = {}) {
-  return new Promise((resolve, reject) => {
-    const url = new URL(urlStr);
-    const lib = url.protocol === "https:" ? https : http;
 
-    const req = lib.request(
-      url,
-      {
-        method: "GET",
-        headers: {
-          "User-Agent": "Mozilla/5.0",
-          "Accept": "*/*",
-          "Accept-Encoding": "gzip, deflate, br",
-        },
-      },
-      (res) => {
-        const status = res.statusCode ?? 0;
-
-        // redirects
-        if ([301, 302, 303, 307, 308].includes(status) && res.headers.location && redirects > 0) {
-          const next = new URL(res.headers.location, url).toString();
-          res.resume();
-          return resolve(requestBuffer(next, { timeoutMs, maxBytes, redirects: redirects - 1 }));
-        }
-
-        if (status < 200 || status >= 300) {
-          const chunks = [];
-          res.on("data", (d) => chunks.push(d));
-          res.on("end", () => {
-            const body = Buffer.concat(chunks).toString("utf8").slice(0, 500);
-            reject(new Error(`HTTP ${status}: ${body}`));
-          });
-          return;
-        }
-
-        const chunks = [];
-        let size = 0;
-
-        res.on("data", (d) => {
-          size += d.length;
-          if (size > maxBytes) {
-            req.destroy(new Error(`Response too large (> ${maxBytes} bytes)`));
-            return;
-          }
-          chunks.push(d);
-        });
-
-        res.on("end", () => {
-          const raw = Buffer.concat(chunks);
-          const out = decompressIfNeeded(raw, res.headers["content-encoding"]);
-          resolve(out);
-        });
-      }
-    );
-
-    req.setTimeout(timeoutMs, () => req.destroy(new Error(`Request timeout after ${timeoutMs}ms`)));
-    req.on("error", reject);
-    req.end();
-  });
-}
-
-async function requestJson(urlStr) {
-  const buf = await requestBuffer(urlStr, { timeoutMs: 25000 });
-  return JSON.parse(buf.toString("utf8"));
-}
-
-const GENRE_TERMS = {
-  pop: ["pop", "top hits", "dance pop", "summer hits", "viral pop"],
-  hiphop: ["hip hop", "rap", "trap", "drill", "r&b hip hop"],
-  rock: ["rock", "alt rock", "indie rock", "classic rock", "punk rock"],
-  country: ["country", "country pop", "americana", "outlaw country"],
-  classical: ["classical", "piano", "orchestra", "symphony", "violin"],
-  random: ["jazz", "lofi", "edm", "hip hop", "indie", "rock", "pop", "soundtrack", "synthwave", "night drive", "chill"],
-};
-
-async function getRandomItunesTrack(genre) {
-  const terms = GENRE_TERMS[genre] ?? GENRE_TERMS.random;
-
-  for (let attempt = 1; attempt <= 6; attempt++) {
-    const term = pick(terms);
-    const url = new URL("https://itunes.apple.com/search");
-    url.searchParams.set("term", term);
-    url.searchParams.set("media", "music");
-    url.searchParams.set("entity", "song");
-    url.searchParams.set("limit", "50");
-    url.searchParams.set("country", "US");
-
-    try {
-      const data = await requestJson(url.toString());
-      const results = Array.isArray(data?.results) ? data.results : [];
-      const candidates = results.filter(
-        (r) => typeof r?.previewUrl === "string" && r.previewUrl.startsWith("http")
-      );
-      if (!candidates.length) throw new Error("No previewUrl results.");
-      const track = pick(candidates);
-
-      return {
-        previewUrl: track.previewUrl,
-        trackName: track.trackName ?? "Unknown track",
-        artistName: track.artistName ?? "Unknown artist",
-        primaryGenreName: track.primaryGenreName ?? "Unknown genre",
-        releaseDate: track.releaseDate ?? null,
-        collectionName: track.collectionName ?? null,
-      };
-    } catch {
-      await sleep(350);
-    }
-  }
-
-  throw new Error("Failed to get iTunes track after retries.");
-}
-
-async function downloadToTempFile(previewUrl) {
-  const buf = await requestBuffer(previewUrl, { timeoutMs: 35000, maxBytes: 12_000_000 });
-  if (buf.length < 25_000) throw new Error(`Preview too small (${buf.length} bytes)`);
-
-  const ext = path.extname(new URL(previewUrl).pathname) || ".m4a";
-  const tmpPath = path.join(
-    os.tmpdir(),
-    `itunes_preview_${Date.now()}_${Math.random().toString(16).slice(2)}${ext}`
-  );
-
-  await fs.promises.writeFile(tmpPath, buf);
-  return tmpPath;
-}
 
 async function safeUnlink(p) {
   try { await fs.promises.unlink(p); } catch {}
@@ -256,14 +117,8 @@ async function playPreview(player, filePath) {
 }
 
 function pointsFor(difficulty, hintsUsed) {
-  const base = difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3;
-  return Math.max(1, base - (hintsUsed ?? 0));
-}
-
-function maxHintsFor(difficulty) {
-  if (difficulty === "easy") return 2;
-  if (difficulty === "medium") return 1;
-  return 1; // hard still allows 1 hint (flowchart shows hint path)
+  // scoring is based solely on difficulty; hints no longer exist
+  return difficulty === "easy" ? 1 : difficulty === "medium" ? 2 : 3;
 }
 
 function isCorrectGuess(msgContent, track, difficulty) {
@@ -307,11 +162,11 @@ export default {
     const embed = new EmbedBuilder()
       .setColor(0x1db954)
       .setTitle("🎵 Music Trivia")
-      .setDescription("Select a difficulty to begin (10 questions).")
+      .setDescription(`Select a difficulty to begin (10 questions). You’ll hear a 30s preview and then have 15 seconds to answer each multiple-choice question. A replay button allows one additional listen per song. A hint button provides a single clue per round.`)
       .addFields(
-        { name: "Easy", value: "1 point • accepts title OR artist", inline: true },
-        { name: "Medium", value: "2 points • accepts title", inline: true },
-        { name: "Hard", value: "3 points • requires title AND artist", inline: true }
+        { name: "Easy", value: "1 point • artist or genre questions", inline: true },
+        { name: "Medium", value: "2 points • album or track-title questions", inline: true },
+        { name: "Hard", value: "3 points • release-year questions", inline: true }
       );
 
     const row = new ActionRowBuilder().addComponents(
@@ -375,9 +230,6 @@ export default {
       totalRounds: 10,
       round: 0,
       currentTrack: null,
-      hintStage: 0,
-      hintsUsed: 0,
-      maxHints: maxHintsFor(difficulty),
       textChannelId: tc.id,
       voiceChannelId: vc.id,
     };
@@ -390,8 +242,9 @@ export default {
       `Difficulty: **${difficulty.toUpperCase()}** • Genre: **${genre}**\n\n` +
       `➡️ Join voice channel **${VOICE_CHANNEL_NAME}**.\n` +
       `✅ You’ll hear **30s** of a song preview.\n` +
-      `💬 Type your guess in <#${tc.id}>.\n` +
-      `💡 Use **/hint** (or the Hint button) if available.\n`
+      `💬 After the preview ends you’ll have **15 seconds** to answer using the multiple-choice buttons in <#${tc.id}>.\n` +
+      `🔁 A replay button lets you hear the song one more time; using it restarts the timer (only once per round).\n` +
+      `💡 A hint button provides one clue per round.\n`
     );
 
     // flowchart: User in Game channel? (loop)
@@ -425,15 +278,14 @@ export default {
         }
 
         // Round state
+        // always pull a fresh random track; previous connection logic
+        // (e.g. from /game) has been removed and is no longer relevant.
         const track = await getRandomItunesTrack(genre);
-        const tmp = await downloadToTempFile(track.previewUrl);
+        const tmp = await downloadPreview(track.previewUrl);
 
         const updated = getSession(guild.id);
         updated.round = round;
         updated.currentTrack = track;
-        updated.hintStage = 0;
-        updated.hintsUsed = 0;
-        updated.maxHints = maxHintsFor(difficulty);
         updated.tmpFile = tmp;
         setSession(guild.id, updated);
 
@@ -448,54 +300,116 @@ export default {
 
         const listenMsg = await tc.send({ embeds: [listenEmbed] });
 
-        // flowchart: User listens to song for 30 seconds
-        await playPreview(player, tmp);
-       
+              // flowchart: User listens to song for 30 seconds
+        try {
+          await playPreview(player, tmp);
+        } catch (e) {
+          // if FFmpeg isn't installed, give a helpful message and abort the game
+          if (String(e.message).includes("FFmpeg/avconv not found")) {
+            await tc.send("❌ Audio playback failed: FFmpeg is not installed on the server. Please install it before running trivia.");
+          } else {
+            await tc.send(`❌ Audio playback error: ${e.message}`);
+          }
+          throw e; // rethrow to trigger outer cleanup
+        }
 
-        // Guess phase + hint controls
-        const hintRow = new ActionRowBuilder().addComponents(
+        // immediately build the question and UI components; players have 10
+        // seconds to respond once the preview stops (no music will be playing).
+        const question = await makeSongQuestion(track, difficulty);
+        const { embed: questionEmbed, actionRow: answerRow } = createTriviaQuestion(question);
+
+        // question row plus control row (replay button)
+        const controlRow = new ActionRowBuilder().addComponents(
+          new ButtonBuilder()
+            .setCustomId("trivia_replay")
+            .setLabel("Replay")
+            .setStyle(ButtonStyle.Primary)
+            .setDisabled(false),
           new ButtonBuilder()
             .setCustomId("trivia_hint")
             .setLabel("Hint")
             .setStyle(ButtonStyle.Secondary)
-            .setDisabled(updated.maxHints <= 0),
-          new ButtonBuilder()
-            .setCustomId("trivia_replay")
-            .setLabel("Replay")
-            .setStyle(ButtonStyle.Primary),
-          new ButtonBuilder()
-            .setCustomId("trivia_skip")
-            .setLabel("Skip")
-            .setStyle(ButtonStyle.Danger)
+            .setDisabled(false)
         );
+        const roundMsg = await tc.send({ embeds: [questionEmbed], components: [answerRow, controlRow] });
+        let replayUsed = false;
+        let hintUsed = false;
 
-        const guessEmbed = new EmbedBuilder()
-          .setColor(0x5865f2)
-          .setTitle(`⌨️ Guess time! (Round ${round}/10)`)
-          .setDescription(
-            `Type your guess in <#${tc.id}>.\n` +
-            `You can use **/hint** or press **Hint**.\n`
-          )
-          .addFields({ name: "Hints available", value: `${updated.maxHints}`, inline: true });
+        let winner = { correct: false, userId: null };
+        const answeredUsers = new Set();
 
-        const roundMsg = await tc.send({ embeds: [guessEmbed], components: [hintRow] });
+        const componentCollector = roundMsg.createMessageComponentCollector({ time: 15000 });
 
-        let revealedHints = [];
+        // when we restart via replay we will reset this collector’s timer
 
-        const componentCollector = roundMsg.createMessageComponentCollector({
-          time: 30000,
-        });
-
-        let skipped = false;
 
         componentCollector.on("collect", async (i) => {
-         if (i.customId === "trivia_replay") {
+          // answers can only be attempted once per user
+          if (i.customId.startsWith("trivia_answer_")) {
+            if (answeredUsers.has(i.user.id)) {
+              await i.reply({ content: "You already answered this round.", ephemeral: true });
+              return;
+            }
+            answeredUsers.add(i.user.id);
+
+            const idx = parseInt(i.customId.replace("trivia_answer_", ""), 10);
+            const selected = question.options[idx];
+            if (selected === question.correctAnswer) {
+              winner = { correct: true, userId: i.user.id };
+
+              // shade correct button green and disable all
+              const newRows = ActionRowBuilder.from(answerRow).setComponents(
+                answerRow.components.map((b) =>
+                  b.data.custom_id === i.customId
+                    ? ButtonBuilder.from(b).setStyle(ButtonStyle.Success).setDisabled(true)
+                    : ButtonBuilder.from(b).setDisabled(true)
+                )
+              );
+await roundMsg.edit({ components: [newRows] });
+
+              await i.deferUpdate();
+              componentCollector.stop("correct");
+            } else {
+              // shade wrong button red and disable just it
+              const newRow = ActionRowBuilder.from(answerRow).setComponents(
+                answerRow.components.map((b) =>
+                  b.data.custom_id === i.customId
+                    ? ButtonBuilder.from(b).setStyle(ButtonStyle.Danger).setDisabled(true)
+                    : b
+                )
+              );
+                await roundMsg.edit({ components: [newRow] });
+              await i.reply({ content: "❌ Wrong answer!", ephemeral: true });
+            }
+            return;
+          }
+
+          if (i.customId === "trivia_replay") {
+            // only once per round
+            if (replayUsed) {
+              await i.reply({ content: "Replay already used for this song.", ephemeral: true });
+              return;
+            }
+            replayUsed = true;
             const ss = getSession(guild.id);
             if (!ss?.active || !ss.tmpFile) {
               await i.reply({ content: "Replay unavailable.", ephemeral: true });
               return;
             }
+            // disable the replay button only
+            try {
+              const disabledCtrl = ActionRowBuilder.from(controlRow).setComponents(
+                controlRow.components.map((b) =>
+                  b.data.custom_id === "trivia_replay"
+                    ? ButtonBuilder.from(b).setDisabled(true)
+                    : ButtonBuilder.from(b)
+                )
+              );
+              await roundMsg.edit({ components: [answerRow, disabledCtrl] });
+            } catch {}
+
             await i.deferUpdate();
+            // replay audio and reset timer
             (async () => {
               try {
                 try { player.stop(true); } catch {}
@@ -514,107 +428,94 @@ export default {
                 console.error("Replay failed:", err);
               }
             })();
-            return;
-          }
-           
-          if (i.customId === "trivia_skip") {
-            skipped = true;
-            await i.deferUpdate();
-            componentCollector.stop("skipped");
+            componentCollector.resetTimer({ time: 15000 });
             return;
           }
 
           if (i.customId === "trivia_hint") {
-            const ss = getSession(guild.id);
-            if (!ss?.active || !ss.currentTrack) {
-              await i.reply({ content: "No active round.", ephemeral: true });
+            if (hintUsed) {
+              await i.reply({ content: "Hint already used this round.", ephemeral: true });
               return;
             }
-            if (ss.hintsUsed >= ss.maxHints) {
-              await i.reply({ content: "No more hints available.", ephemeral: true });
-              return;
-            }
-
-            ss.hintsUsed += 1;
-            ss.hintStage += 1;
-            setSession(guild.id, ss);
-
-            const hint = makeHint(ss.currentTrack, ss.hintStage, ss.difficulty);
-            revealedHints.push(hint);
-
-            const newEmbed = EmbedBuilder.from(guessEmbed).setFields(
-              { name: "Hints used", value: `${ss.hintsUsed}/${ss.maxHints}`, inline: true },
-              ...(revealedHints.length
-                ? [{ name: "Hints", value: revealedHints.map((h, idx) => `${idx + 1}. ${h}`).join("\n") }]
-                : [])
-            );
-
+            hintUsed = true;
             await i.deferUpdate();
-            await roundMsg.edit({ embeds: [newEmbed] });
+            const hint = makeHint(track, 1, difficulty);
+            await tc.send({ content: `💡 Hint: ${hint}`, ephemeral: true });
+            // disable the hint button
+            try {
+              const disabledCtrl = ActionRowBuilder.from(controlRow).setComponents(
+                controlRow.components.map((b) =>
+                  b.data.custom_id === "trivia_hint"
+                    ? ButtonBuilder.from(b).setDisabled(true)
+                    : ButtonBuilder.from(b)
+                )
+              );
+              await roundMsg.edit({ components: [answerRow, disabledCtrl] });
+            } catch {}
+            return;
           }
+
         });
 
-        const winner = await new Promise((resolve) => {
-          const msgCollector = tc.createMessageCollector({
-            time: 30000,
-            filter: (m) => !m.author.bot && m.content && m.channelId === tc.id,
-          });
-
-          msgCollector.on("collect", (m) => {
-            if (skipped) return;
+        // wrap the end handler in a promise so the outer loop can await it
+        const endPromise = new Promise((resolve) => {
+          componentCollector.on("end", async (collected, reason) => {
+            // when round ends highlight correct answer if nobody already chose it
+            try {
+              const highlighted = ActionRowBuilder.from(answerRow).setComponents(
+                answerRow.components.map((b) => {
+                  const btn = ButtonBuilder.from(b);
+                  const idx = parseInt(btn.data.custom_id.replace("trivia_answer_", ""), 10);
+                  if (question.options[idx] === question.correctAnswer) {
+                    btn.setStyle(ButtonStyle.Success);
+                  }
+                  return btn.setDisabled(true);
+                })
+              );
+              await roundMsg.edit({ components: [highlighted] });
+            } catch {}
 
             const ss = getSession(guild.id);
-            if (!ss?.active || !ss.currentTrack) return;
+            const answerLine = `✅ **${track.trackName}** — **${track.artistName}**`;
 
-            if (isCorrectGuess(m.content, ss.currentTrack, ss.difficulty)) {
-              msgCollector.stop("correct");
-              resolve({ correct: true, userId: m.author.id });
+            if (winner.correct && winner.userId) {
+              const pts = pointsFor(difficulty);
+              addPoints(guild.id, winner.userId, pts);
+              const top = getGuildScoresSorted(guild.id).slice(0, 5);
+              const topLines = top.map(([uid, p], idx) => `${idx + 1}. <@${uid}> — **${p}**`).join("\n");
+
+              const resultEmbed = createResultEmbed(question, question.correctAnswer, { username: `<@${winner.userId}>` });
+              await tc.send({ embeds: [resultEmbed] });
+              await tc.send(`🏆 **Top Scores**\n${topLines}`);
+            } else {
+              await tc.send(`❌ Time! No correct guesses.\n${answerLine}`);
             }
+
+            // cleanup file + message from listening phase
+
+            // brief 5 second pause before next round; gives players a breather
+            await sleep(5000);
+            try {
+              const ss2 = getSession(guild.id);
+              if (ss2?.tmpFile) {
+                await safeUnlink(ss2.tmpFile);
+                ss2.tmpFile = null;
+                setSession(guild.id, ss2);
+              }
+            } catch {}
+
+            // old shorter delay removed (handled above)
+            try { await listenMsg.delete().catch(() => {}); } catch {}
+
+            resolve();
           });
-
-          msgCollector.on("end", () => resolve({ correct: false, userId: null }));
         });
+        // pause here until the round’s collector has finished firing its end handler
+        await endPromise;
 
-        componentCollector.stop("round_done");
 
-        // Disable buttons
-        try {
-          const disabled = new ActionRowBuilder().addComponents(
-            hintRow.components.map((b) => ButtonBuilder.from(b).setDisabled(true))
-          );
-          await roundMsg.edit({ components: [disabled] });
-        } catch {}
 
-        const ss = getSession(guild.id);
-        const answerLine = `✅ **${track.trackName}** — **${track.artistName}**`;
 
-        // flowchart: Correct? -> Points displayed / Incorrect message
-        if (winner.correct && winner.userId) {
-          const pts = pointsFor(difficulty, ss?.hintsUsed ?? 0);
-          // TODO: This does not function 
-          addPoints(guild.id, winner.userId, pts);
-          // No such method
-          const top = getGuildScoresSorted(guild.id).slice(0, 5);
-          const topLines = top.map(([uid, p], idx) => `${idx + 1}. <@${uid}> — **${p}**`).join("\n");
-
-          await tc.send(
-            `🎉 Correct! <@${winner.userId}> gets **${pts}** point(s).\n${answerLine}\n\n🏆 **Top Scores**\n${topLines}`
-          );
-        } else {
-          await tc.send(`❌ Time! No correct guesses.\n${answerLine}`);
-        }
-
-        try {
-          const ss = getSession(guild.id);
-          if (ss?.tmpFile) {
-            await safeUnlink(ss.tmpFile);
-            ss.tmpFile = null;
-            setSession(guild.id, ss);
-          }
-        } catch {}
-
-        await sleep(1200);
-        try { await listenMsg.delete().catch(() => {}); } catch {}
       }
 
       // flowchart: Answered 10 questions? -> end

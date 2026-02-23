@@ -1,5 +1,5 @@
 export const activeSessions = new Map(); // guildId -> session
-export const guildPrefs = new Map();     // guildId -> { genre }
+export const guildPrefs = new Map(); // guildId -> { genre }
 
 export function getGenre(guildId) {
   return guildPrefs.get(guildId)?.genre ?? "random";
@@ -20,3 +20,4 @@ export function setSession(guildId, session) {
 export function clearSession(guildId) {
   activeSessions.delete(guildId);
 }
+
