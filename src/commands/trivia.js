@@ -331,10 +331,7 @@ export default {
             .setStyle(ButtonStyle.Secondary)
             .setDisabled(false)
         );
-
-        // when you are given answer choices
         const roundMsg = await tc.send({ embeds: [questionEmbed], components: [answerRow, controlRow] });
-  
         let replayUsed = false;
         let hintUsed = false;
 
@@ -343,32 +340,9 @@ export default {
 
         const componentCollector = roundMsg.createMessageComponentCollector({ time: 15000 });
 
-        // visual timer
-        let timeLeft = 15;
-        let timerInterval = null;
-        function startTimer() {
-          clearInterval(timerInterval);
-          timeLeft = 15;
-
-          timerInterval = setInterval(async () => {
-            if (timeLeft <= 0) return;
-            timeLeft--;
-
-            try {
-              const updatedEmbed = EmbedBuilder.from(questionEmbed)
-                .setFooter({ text: `⏳ Time left: ${timeLeft}s` });
-
-              await roundMsg.edit({
-                embeds: [updatedEmbed],
-                components: [answerRow, controlRow],
-              });
-            } catch {}
-          }, 1000);
-        }
-        startTimer();
-
-
         // when we restart via replay we will reset this collector’s timer
+
+
         componentCollector.on("collect", async (i) => {
           // answers can only be attempted once per user
           if (i.customId.startsWith("trivia_answer_")) {
@@ -382,7 +356,6 @@ export default {
             const selected = question.options[idx];
             if (selected === question.correctAnswer) {
               winner = { correct: true, userId: i.user.id };
-              clearInterval(timerInterval);
 
               // shade correct button green and disable all
               const newRows = ActionRowBuilder.from(answerRow).setComponents(
@@ -397,7 +370,6 @@ await roundMsg.edit({ components: [newRows] });
               await i.deferUpdate();
               componentCollector.stop("correct");
             } else {
-              clearInterval(timerInterval); // stop timer 
               // shade wrong button red and disable just it
               const newRow = ActionRowBuilder.from(answerRow).setComponents(
                 answerRow.components.map((b) =>
@@ -408,7 +380,6 @@ await roundMsg.edit({ components: [newRows] });
               );
                 await roundMsg.edit({ components: [newRow] });
               await i.reply({ content: "❌ Wrong answer!", ephemeral: true });
-              componentCollector.stop("answered");
             }
             return;
           }
@@ -457,7 +428,6 @@ await roundMsg.edit({ components: [newRows] });
                 console.error("Replay failed:", err);
               }
             })();
-            startTimer();
             componentCollector.resetTimer({ time: 15000 });
             return;
           }
