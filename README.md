@@ -60,7 +60,7 @@ Requirements:
 
 #### Primary added features
 - Added logging for all implemented features
-- `/game` command: joins voice channel `Game`, downloads a random iTunes 30s preview, plays it, cleans up, leaves voice, then runs a 30s countdown message in `#game` and finally reveals the track name
+- `/trivia` command now handles song previews, guessing, and multiple-choice questions tied to the currently playing iTunes track.  The old `/game` command has been removed.
 - Logs to terminal for debugging voice/HTTP/command execution
 
 ##### Pre-Build commands (new)
@@ -102,9 +102,29 @@ npm i -D @discordjs/rest discord-api-types
 > # Version 1.0.5
 > ### Kieran Moynihan - Release Notes
 ### Added:
-```  
+```
 - Added a score tracker and a command to see the current score
 ```
+
+> # Version 2.0.0
+> ### Maintenance update
+### ArteenR Changes:
+```
+- Enforced 15‑second answer window after each preview; unanswered rounds end
+  automatically.
+- Tested skip functionality but chose to remove.
+- Added hint feature, needs to still be cleaned up.
+- Modified replay button; limited to one use per song and restarts the timer.
+- Added a hint button (one use per round) that does not affect the timer.
+- After each round ends there is a 5‑second pause before the next preview begins.
+- Difficulty selection descriptions updated to match question types:
+  easy=artist/genre, medium=album/title, hard=year.
+- Fixed crash caused by overly long button IDs by using numeric indices.
+- Questions are all relevant to the song being played
+- Ensured a round only moves on after the previous round is over
+- Cleaned up Gameplay loop
+```
+
 
 
 
