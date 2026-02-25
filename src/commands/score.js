@@ -1,35 +1,27 @@
 import { SlashCommandBuilder } from "discord.js";
-const scoreStore = require('../helpers/scoreStore.js');
+import { getUserPoints } from "../helpers/scoreStore.js";
 
 export default {
   data: new SlashCommandBuilder()
     .setName("score")
-    .setDescription("Shows a player's current game score")
-    .addUserOption(option =>
-      option
-        .setName("user_name")
-        .setDescription("Enter a username (optional)")
-        .setRequired(false)
-    ),
+    .setDescription("Shows your current score"),
 
   async execute(interaction) {
-    let userId = interaction.options.getUser("user_name")?.id || interaction.user.id;
-    let username = interaction.options.getUser("user_name")?.username || interaction.user.username;
-    const allTimeScore = scoreStore.getUserAllTimePoints(interaction.guild.id, userId);
-    
-    // If scoreStore returned 0 it means the user's score is not recorded
-    if(allTimeScore == 0){
-      await interaction.reply({
-        content : username + " has never played before, so they have no score.",
+    if (!interaction.guild) {
+      return interaction.reply({
+        content: "This command can only be used in a server.",
+        ephemeral: true,
       });
-      return;
     }
 
-    const score = scoreStore.getUserPoints(interaction.guild.id, userId);
+    const guildId = interaction.guild.id;
+    const userId = interaction.user.id;
 
-    // Tell the score of the user
+    const score = getUserPoints(guildId, userId);
+
     await interaction.reply({
-      content : username + `'s current score: **${score}**, all time score: **${allTimeScore}**`,
+      content: `Your current score: ${score}`,
+      ephemeral: true,
     });
   },
 };
