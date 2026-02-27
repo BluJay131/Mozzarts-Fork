@@ -406,6 +406,8 @@ export default {
         const question = await makeSongQuestion(track, difficulty);
         const { embed: questionEmbed, actionRow: answerRow } = createTriviaQuestion(question);
 
+        // question row plus control row (replay button)
+        // For hard difficulty, disable the hint button since no hints are allowed
         const controlRow = new ActionRowBuilder().addComponents(
           new ButtonBuilder()
             .setCustomId("trivia_replay")
@@ -416,7 +418,7 @@ export default {
             .setCustomId("trivia_hint")
             .setLabel("Hint")
             .setStyle(ButtonStyle.Secondary)
-            .setDisabled(false)
+            .setDisabled(difficulty === "hard")
         );
 
         const roundMsg = await tc.send({
@@ -613,6 +615,11 @@ export default {
 
           // ===== HINT =====
           if (i.customId === "trivia_hint") {
+            // hints are not allowed for hard difficulty
+            if (difficulty === "hard") {
+              await i.reply({ content: "Hints are not allowed for hard difficulty.", ephemeral: true });
+              return;
+            }
             if (hintUsed) {
               await i.reply({ content: "Hint already used this round.", ephemeral: true });
               return;
@@ -670,6 +677,7 @@ export default {
               return;
             }
 
+            // when round ends highlight correct answer if nobody already chose it
             try {
               const highlighted = ActionRowBuilder.from(answerRow).setComponents(
                 answerRow.components.map((b) => {

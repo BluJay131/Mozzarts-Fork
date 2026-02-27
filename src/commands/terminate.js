@@ -3,9 +3,12 @@ import {
   PermissionsBitField,
   ActionRowBuilder,
   ButtonBuilder,
+  MessageFlags
 } from "discord.js";
 import fs from "node:fs";
-import { getSession, terminateSession, setSession } from "../gameState.js";
+import { getSession, terminateSession, setSession, clearSession} from "../gameState.js";
+import { getVoiceConnection } from "@discordjs/voice";
+const VOICE_CHANNEL_NAME = "Game";
 
 async function safeUnlink(p) {
   try {
@@ -22,7 +25,7 @@ export default {
 
   async execute(interaction) {
     if (!interaction.guild) {
-      return interaction.reply({ content: "Guild only.", ephemeral: true });
+      return interaction.reply({ content: "Guild only.", flags: MessageFlags.Ephemeral });
     }
 
     const member = interaction.member;
@@ -32,7 +35,7 @@ export default {
     if (!isAdmin) {
       return interaction.reply({
         content: "You must be a server administrator to use this command.",
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
     }
 
