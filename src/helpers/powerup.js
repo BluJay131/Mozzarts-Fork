@@ -1,4 +1,4 @@
-import { SlashCommandBuilder } from "discord.js";
+//import { SlashCommandBuilder } from "discord.js";
 
 const powerups = new Map();
 
@@ -8,6 +8,20 @@ function getGuildStore(guildId) {
   }
   return powerups.get(guildId);
 }
+
+export function awardRandomPowerup(guildId, userId) {
+  const guildStore = getGuildStore(guildId);
+  const options = ["freeze", "doublePoints"];
+  const randPowerup = options[Math.floor(Math.random() * options.length)];
+
+  // Check if they already have it to prevent over-stacking
+  if (guildStore[userId]?.[randPowerup]) return null;
+
+  // Save it
+  guildStore[userId] = { ...guildStore[userId], [randPowerup]: true };
+  return randPowerup;
+}
+
 //Checks if user has a freeze powerup.
 export function consumeFreeze(guildId, userId) {
   const guildStore = powerups.get(guildId);
@@ -29,7 +43,7 @@ export function consumeDoublePoints(guildId, userId) {
   }
   return false;
 }
-
+/*
 export default {
   data: new SlashCommandBuilder()
     .setName("powerup")
@@ -50,6 +64,7 @@ export default {
     const guildStore = getGuildStore(guildId);
     const options = ["freeze", "doublePoints"];
 
+    
     // For randomly getting a powerup from the powerup options
     const randPowerup = options[Math.floor(Math.random() * options.length)]
     // Prevent stacking infinite freezes
@@ -82,4 +97,5 @@ export default {
       }
     }
   },
-};
+  
+};*/
