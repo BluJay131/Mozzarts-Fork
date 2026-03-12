@@ -336,7 +336,7 @@ export default {
       guildId: guild.id,
       hostId: interaction.user.id,
       difficulty,
-      totalRounds: 5,
+      totalRounds: 10,
       round: 0,
       currentTrack: null,
       textChannelId: tc.id,
@@ -409,7 +409,7 @@ export default {
       // manage the state for each round.
       // TODO: Add a way to break out of the loop early if there are no players 
       // or if the admin wants to end the game early.(Maybe even user who invoked it too?)
-      for (let round = 1; round <= 5; round++) {
+      for (let round = 1; round <= 10; round++) {
         const s = getSession(guild.id);
         // check for an administrator-initiated termination 
         if (s?.terminated) break;
@@ -453,7 +453,7 @@ export default {
         // and also to allow the user to know how long the preview plays for.
         const listenEmbed = new EmbedBuilder()
           .setColor(0x2b2d31)
-          .setTitle(`🎧 Round ${round}/5`)
+          .setTitle(`🎧 Round ${round}/10`)
           .setDescription(`Listening for **30 seconds**...`)
           .addFields(
             { name: "Difficulty", value: difficulty.toUpperCase(), inline: true },
@@ -469,10 +469,44 @@ export default {
 
 const { base, replayAdd } = difficultyTimer[difficulty];
           // We keep a reference to this message so that we can delete it after the preview is over to keep the channel clean.
-          const listenMsg = await tc.send({ embeds: [listenEmbed] });
-        // flowchart: User listens to song for 30 seconds -> question + answers are shown in tc
+          // Button to skip preview of the song and go straight to questions
+          const previewRow = new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+              .setCustomId("skip_preview")
+              .setLabel("Skip Preview")
+              .setStyle(ButtonStyle.Primary)
+          );
+          const listenMsg = await tc.send({ embeds: [listenEmbed], components: [previewRow], });
+          const previewCollector = listenMsg.createMessageComponentCollector({
+          time: 30000,
+          });
+
+          previewCollector.on("collect", async (i) => {
+            if (i.customId !== "skip_preview") return;
+
+            await i.deferUpdate();
+
+            try {
+              player.stop(true); 
+            } catch {}
+
+            previewCollector.stop("skipped");
+          });
+        
+        
+          // flowchart: User listens to song for 30 seconds -> question + answers are shown in tc
         try {
           await playPreview(player, tmp, guild.id);
+          // disable button after preview finishes
+          try {
+            const disabledRow = new ActionRowBuilder().addComponents(
+              previewRow.components.map((b) =>
+                ButtonBuilder.from(b).setDisabled(true)
+              )
+            );
+
+            await listenMsg.edit({ components: [disabledRow] });
+          } catch {}
 
           const sAfterPreview = getSession(guild.id);
           if (!sAfterPreview?.active || sAfterPreview?.terminated) {
@@ -874,6 +908,8 @@ const { base, replayAdd } = difficultyTimer[difficulty];
       } else {
         const highestScorer = final[0];
         addGameWon(guild.id, highestScorer[0]); // increase their games won stat
+        const lines = final.slice(0, 10).map(([uid, pts], i) => `${i + 1}. <@${uid}> — **${pts}**`);
+        await tc.send(`🏁 **Game over! Final scoreboard:**\n${lines.join("\n")}`);
       }
 
       // ===== END OF GAME (SKIP IF TERMINATED) =====
