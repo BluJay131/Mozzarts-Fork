@@ -26,7 +26,7 @@ import { addRoundPlayed, addRoundWon, addGamePlayed, addGameWon } from "../helpe
 import { makeHint } from "../helpers/hintHelper.js";
 import { makeSongQuestion, createTriviaQuestion, createResultEmbed } from "../helpers/triviaHelper.js";
 import { getRandomItunesTrack, downloadPreview } from "../helpers/itunes.js";
-import { consumeFreeze , consumeDoublePoints} from "./powerup.js";
+import { consumeFreeze , consumeDoublePoints, awardRandomPowerup} from "../helpers/powerup.js";
 
 const VOICE_CHANNEL_NAME = "Game";
 const TEXT_CHANNEL_NAME = "game";
@@ -460,14 +460,14 @@ export default {
             { name: "Genre", value: String(genre).toUpperCase(), inline: true }
           );
 
-          // changes time allowed for each round depending on difficulty 
-          const difficultyTimer = {
-            easy: { base: 15, replayAdd: 15 },
-            medium: { base: 15, replayAdd: 10 },
-            hard: { base: 15, replayAdd: 5 },
-          };
+        // changes time allowed for each round depending on difficulty 
+        const difficultyTimer = {
+          easy: { base: 15, replayAdd: 15 },
+          medium: { base: 15, replayAdd: 10 },
+          hard: { base: 15, replayAdd: 5 },
+        };
 
-const { base, replayAdd } = difficultyTimer[difficulty];
+        const { base, replayAdd } = difficultyTimer[difficulty];
           // We keep a reference to this message so that we can delete it after the preview is over to keep the channel clean.
           // Button to skip preview of the song and go straight to questions
           const previewRow = new ActionRowBuilder().addComponents(
@@ -745,7 +745,7 @@ const { base, replayAdd } = difficultyTimer[difficulty];
                     st3.previewStopper = null;
                     setSession(guild.id, st3);
                   }
-                } catch {}
+                } catch(err) {console.error("Failed to stop session", err)}
               } catch {}
             })();
             if (!freezeActive) {
@@ -761,7 +761,7 @@ const { base, replayAdd } = difficultyTimer[difficulty];
                   embeds: [updatedEmbed],
                   components: [answerRow, controlRow],
                 });
-              } catch {}
+              } catch(err) {console.error("Failed to update timer UI after replay",err)}
             }
             return;
           }
@@ -788,7 +788,7 @@ const { base, replayAdd } = difficultyTimer[difficulty];
                 )
               );
               await roundMsg.edit({ components: [answerRow, disabledCtrl] }).catch(() => {});
-            } catch {}
+            } catch(err) { console.error("Failed to disable components:", err); }
 
             const hint = makeHint(track, question.type);
             await i.reply({ content: `💡 Hint: ${hint}`, ephemeral: true }).catch(async () => {
@@ -803,7 +803,7 @@ const { base, replayAdd } = difficultyTimer[difficulty];
             const stEnd = getSession(guild.id);
 
             if (reason === "terminated" || !stEnd?.active || stEnd?.terminated) {
-              try { clearInterval(timerInterval); } catch {}
+              try { clearInterval(timerInterval); } catch(err) { console.error("Failed to clear timer interval:", err); }
 
               try {
                 const disabledAnswer = ActionRowBuilder.from(answerRow).setComponents(
@@ -813,7 +813,7 @@ const { base, replayAdd } = difficultyTimer[difficulty];
                   controlRow.components.map((b) => ButtonBuilder.from(b).setDisabled(true))
                 );
                 await roundMsg.edit({ components: [disabledAnswer, disabledCtrl] }).catch(() => {});
-              } catch {}
+              } catch(err) { console.error("Failed to disable components:", err); }
 
               try {
                 const ss2 = getSession(guild.id);
@@ -822,9 +822,9 @@ const { base, replayAdd } = difficultyTimer[difficulty];
                   ss2.tmpFile = null;
                   setSession(guild.id, ss2);
                 }
-              } catch {}
+              } catch(err) { console.error("Failed to cleanup temporary file:", err); }
 
-              try { await listenMsg.delete().catch(() => {}); } catch {}
+              try { await listenMsg.delete().catch(() => {}); } catch(err) { console.error("Failed to delete listen message:", err); }
 
               resolve();
               return;
@@ -846,18 +846,31 @@ const { base, replayAdd } = difficultyTimer[difficulty];
               );
 
               await roundMsg.edit({ components: [highlighted, disabledCtrl] }).catch(() => {});
-            } catch {}
+            } catch(err) { console.error("Failed to highlight correct answer:", err); }
 
             const answerLine = `✅ **Correct answer:** ${question.correctAnswer}`;
 
             if (winner.correct && winner.userId) {
               let pts = pointsFor(difficulty);
-              
               if(doublePtsActive) {
                 pts *= 2;
                 // Changes the question points to display the double points gained
                 question.points *= 2;
               }
+              // TODO: This round will need to be changed to match our 10 rounds
+              if(round < 5) {
+                await tc.send(`🎉 <@${winner.userId}> got it right and earned **${pts}** points! Get ready for the next round...`);
+                const powerupWon = awardRandomPowerup(guild.id, winner.userId);
+                if (powerupWon) {
+                  const powerupName = powerupWon === "freeze" ? "❄️ Freeze Time" : "💰 Double Points";
+                  await tc.send(`🎁 **Bonus!** <@${winner.userId}> won a **${powerupName}** for the next round!`);
+                } else {
+                  await tc.send(`🎁 <@${winner.userId}> did not win a power-up this time. Better luck next round!`);
+                }
+              } else {
+                await tc.send(`🎉 <@${winner.userId}> got it right and earned **${pts}** points!`);
+              }
+              
               addPoints(guild.id, winner.userId, pts);
               addRoundWon(guild.id, winner.userId); // increase their rounds won stat
               const top = getGuildScoresSorted(guild.id).slice(0, 5);
@@ -882,9 +895,9 @@ const { base, replayAdd } = difficultyTimer[difficulty];
                 ss2.tmpFile = null;
                 setSession(guild.id, ss2);
               }
-            } catch {}
+            } catch(err) { console.error("Failed to cleanup temporary file:", err); }
 
-            try { await listenMsg.delete().catch(() => {}); } catch {}
+            try { await listenMsg.delete().catch(() => {}); } catch(err) { console.error("Failed to delete listen message:", err); }
 
             resolve();
           });
