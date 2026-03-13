@@ -181,8 +181,8 @@ Kieran Moynihan Changes:
  - Hint point deduction (#116 by @willnh7)
  - Randomizing the powerup rewarding, user can no longer get a powerup immediately (#88 by @willnh7)
 
-## Khoa's
- - Skip preview (#114 by @khoav22)
+## Khoa Vo
+ - Skip preview of the song (#114 by @khoav22)
  - Less time to listen to replay based on difficulty (#109 by @khoav22)
 
 
