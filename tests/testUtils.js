@@ -42,6 +42,7 @@ export function makeMockInteraction({
 
   const interaction = {
     guild: guild ?? makeMockGuild({ guildId }),
+    guildId,
     user: { id: userId },
     member: {
       permissions: {
@@ -50,6 +51,7 @@ export function makeMockInteraction({
     },
     options: {
       getString: (name) => options[name] ?? null,
+      getUser: (name) => options[name] ? { id: options[name], username: `user${options[name]}` } : null,
     },
     reply,
     followUp,

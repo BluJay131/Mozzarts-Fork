@@ -1,6 +1,6 @@
 import { expect } from "chai";
 import { _test } from "../src/commands/trivia.js";
-import { makeSongQuestion, createTriviaQuestion } from "../src/helpers/trivia.js";
+import { makeSongQuestion, createTriviaQuestion } from "../src/helpers/triviaHelper.js";
 import { makeHint } from "../src/helpers/hintHelper.js";
 
 describe("Trivia helper functions", () => {
@@ -14,9 +14,9 @@ describe("Trivia helper functions", () => {
 
   describe("pointsFor()", () => {
     it("returns base points for a difficulty level (hints ignored)", () => {
-      expect(_test.pointsFor("easy")).to.equal(1);
-      expect(_test.pointsFor("medium")).to.equal(2);
-      expect(_test.pointsFor("hard")).to.equal(3);
+      expect(_test.calculatePoints("easy", false)).to.equal(1);
+      expect(_test.calculatePoints("medium", false)).to.equal(2);
+      expect(_test.calculatePoints("hard", false)).to.equal(3);
     });
   });
   
