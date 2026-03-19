@@ -12,7 +12,7 @@ function getGuildStore(guildId) {
 
 export function awardRandomPowerup(guildId, userId) {
   const guildStore = getGuildStore(guildId);
-  const options = ["freeze", "doublePoints"];
+  const options = ["freeze"]; // ["freeze", "doublePoints"];
   const randPowerup = options[Math.floor(Math.random() * options.length)];
 
   // Check if they already have it to prevent over-stacking

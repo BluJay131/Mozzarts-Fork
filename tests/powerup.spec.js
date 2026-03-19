@@ -1,5 +1,6 @@
 import { expect } from "chai";
-import powerupCmd, { consumeFreeze } from "../src/commands/powerup.js";
+import powerupCmd from "../src/commands/powerup.js";
+import { consumeFreeze } from "../src/helpers/powerup.js";
 import { makeMockInteraction } from "./testUtils.js";
 
 describe("powerup regression", () => {
@@ -10,12 +11,12 @@ describe("powerup regression", () => {
 
     await powerupCmd.execute(interaction);
     expect(interaction.reply.calls).to.have.lengthOf(1);
-    expect(interaction.reply.last[0].content).to.include("Freeze Time");
+    expect(interaction.reply.calls[0][0].content).to.include("Freeze Time");
 
     // second time should be blocked
     await powerupCmd.execute(interaction);
     expect(interaction.reply.calls).to.have.lengthOf(2);
-    expect(interaction.reply.last[0].content).to.include("already have");
+    expect(interaction.reply.calls[1][0].content).to.include("already have");
 
     // consume once => true, then false
     expect(consumeFreeze(g, u)).to.equal(true);

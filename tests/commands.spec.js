@@ -1,6 +1,7 @@
 import { expect } from "chai";
 import scoreCmd from "../src/commands/score.js";
 import getScoreCmd from "../src/commands/getScore.js";
+import leaderboardCmd from "../src/commands/leaderboard.js";
 import genreCmd from "../src/commands/genre.js";
 import terminateCmd from "../src/commands/terminate.js";
 
@@ -35,28 +36,30 @@ describe("commands regression", () => {
       expect(interaction.reply.calls).to.have.lengthOf(1);
       const msg = interaction.reply.last[0];
       expect(msg.ephemeral).to.equal(true);
-      expect(msg.content).to.include("Your current score: 5");
+      expect(msg.content).to.include("Current score: 5");
       expect(msg.content).to.include("Lifetime score: 5");
     });
   });
 
   describe("/getscore", () => {
     it("rejects DM usage (no guild)", async () => {
-      const interaction = makeMockInteraction({ guild: null });
+      const interaction = makeMockInteraction({ guild: null, hasAdmin: true });
       interaction.guild = null;
 
       await getScoreCmd.execute(interaction);
       expect(interaction.reply.calls).to.have.lengthOf(1);
-      expect(interaction.reply.last[0].content).to.include("Guild only");
+      expect(interaction.reply.last[0].content).to.include("This command can only be used in a server.");
       expect(interaction.reply.last[0].ephemeral).to.equal(true);
     });
+  });
 
+  describe("/leaderboard", () => {
     it("shows a friendly message when there are no scores", async () => {
       const g = "g_getscore_empty";
       resetScores(g);
 
       const interaction = makeMockInteraction({ guildId: g });
-      await getScoreCmd.execute(interaction);
+      await leaderboardCmd.execute(interaction);
 
       expect(interaction.reply.calls).to.have.lengthOf(1);
       expect(interaction.reply.last[0].content).to.include("No scores yet");
@@ -71,7 +74,7 @@ describe("commands regression", () => {
       for (let i = 1; i <= 12; i++) addPoints(g, `u${i}`, i); // u12 highest
 
       const interaction = makeMockInteraction({ guildId: g });
-      await getScoreCmd.execute(interaction);
+      await leaderboardCmd.execute(interaction);
 
       const msg = interaction.reply.last[0].content;
       expect(msg).to.include("**Scoreboard (Top 10)**");
@@ -115,7 +118,7 @@ describe("commands regression", () => {
 
       expect(interaction.reply.calls).to.have.lengthOf(1);
       expect(interaction.reply.last[0].content).to.include("must be a server administrator");
-      expect(interaction.reply.last[0].ephemeral).to.equal(true);
+      expect(interaction.reply.last[0].flags).to.equal(64); // MessageFlags.Ephemeral
 
       clearSession(g);
     });
